@@ -1,0 +1,6 @@
+BotConfig {
+	bServer = "irc.freenode.org",
+	bPort = 6667,
+	bChannel = "#swistakbot-test",
+	bNick = "hsbotFromFuture"
+}
