@@ -2,5 +2,7 @@ BotConfig {
 	bServer = "irc.freenode.org",
 	bPort = 6667,
 	bChannel = "#swistakbot-test",
-	bNick = "hsbotFromFuture"
+	bNick = "hsbotFromFuture",
+	bAdmins = ["swistak35", "Greyer", "pm7", "Marqin"],
+	bPlugins = ["DicePlugin", "GooglePlugin", "IrcservPongPlugin", "KarmaPlugin", "QuitPlugin", "WhenPlugin"]
 }

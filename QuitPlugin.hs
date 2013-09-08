@@ -6,7 +6,7 @@ import System.Exit(exitWith, ExitCode(ExitSuccess))
 import Data.List(isPrefixOf)
 import Control.Monad(when)
 
-import IrcUtilities(Plugin(Plugin), IrcMsg(Privmsg), Bot, handle, write)
+import IrcUtilities(Plugin(Plugin), IrcMsg(Privmsg), Bot(Bot), handle, write, isAdmin, nickFromAuthor)
 
 -- Plugin Info
 plugin :: Plugin
@@ -14,7 +14,8 @@ plugin = Plugin "QuitPlugin" run helpAvailableUserCmds helpAvailableModCmds help
 
 -- Main run
 run :: IrcMsg -> Bot -> IO ()
-run (Privmsg _ _ message) bot = when (",quit" `isPrefixOf` message) $ write (handle bot) "QUIT" ":Bye!" >> exitWith ExitSuccess
+run (Privmsg author _ message) bot@(Bot h config _) = when (",quit" `isPrefixOf` message && nick `isAdmin` config) $ write h "QUIT" ":Bye!" >> exitWith ExitSuccess where
+        nick = nickFromAuthor author
 run _ _ = return ()
 
 -- Help
@@ -25,4 +26,4 @@ helpAvailableModCmds :: [String]
 helpAvailableModCmds = ["quit"]
 
 helpCmd :: String -> [String]
-helpCmd "quit" = [",quit # Orders bot to exit the channel and stop."]
+helpCmd "quit" = [",quit # Każe botu sobie pójść"]

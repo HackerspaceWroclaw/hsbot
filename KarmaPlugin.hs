@@ -65,4 +65,4 @@ helpAvailableModCmds :: [String]
 helpAvailableModCmds = []
 
 helpCmd :: String -> [String]
-helpCmd "karma" = [",karma # List people and their karma scores"]
+helpCmd "karma" = [",karma # Wyświetla listę ludzi i ich karmę"]

@@ -3,18 +3,14 @@ import System.IO
 import Text.Printf
 import Data.List
 import System.Exit
+import Control.Monad(mapM)
+import Data.Map(elems)
 import System.Environment (getArgs)
 
 import IrcUtilities
-import qualified WhenPlugin
-import qualified IrcservPongPlugin
-import qualified DicePlugin
-import qualified GooglePlugin
-import qualified KarmaPlugin
-import qualified QuitPlugin
+import PluginsCore(enabledPlugins)
+import HelpCore(runHelp)
 
-allPlugins :: [(String, Plugin)]
-allPlugins = [WhenPlugin.plugin, IrcservPongPlugin.plugin, DicePlugin.plugin, GooglePlugin.plugin, KarmaPlugin.plugin, QuitPlugin.plugin]
 main = do
         (config, configDir) <- fetchConfig
         runBot config configDir
@@ -37,16 +33,12 @@ runBot config configDir = do
         listen (Bot h config configDir)
 
 listen :: Bot -> IO ()
-listen bot = do
-        t <- hGetLine $ handle bot
+listen bot@(Bot h config _) = do
+        t <- hGetLine h
         putStrLn t
         let ircMsg = parseLine t
         putStrLn $ show ircMsg
-        WhenPlugin.run ircMsg bot
-        IrcservPongPlugin.run ircMsg bot
-        DicePlugin.run ircMsg bot
-        GooglePlugin.run ircMsg bot
-        KarmaPlugin.run ircMsg bot
-        QuitPlugin.run ircMsg bot
+        HelpCore.runHelp ircMsg bot
+        mapM (\p -> (run p) ircMsg bot) $ enabledPlugins config
         listen bot
 

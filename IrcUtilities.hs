@@ -5,16 +5,18 @@ module IrcUtilities
 , readInt
 , parseLine
 , IrcMsg(Privmsg, Ping), author, channel, message, host, line
-, BotConfig(BotConfig), bServer, bPort, bChannel, bNick
+, BotConfig(BotConfig), bServer, bPort, bChannel, bNick, bAdmins, bPlugins
 , Bot(Bot), handle, config, configDir
-, Plugin(Plugin)
+, Plugin(Plugin), name, run, helpAvailableUserCmds, helpAvailableModCmds, helpCmd
 , nickFromAuthor
+, isAdmin
 ) where
 
 import Network
 import System.IO
 import Text.Printf
 import Data.List
+import Data.Map(fromList)
 
 data Plugin = Plugin
         { name :: String
@@ -29,6 +31,8 @@ data BotConfig = BotConfig
         , bPort :: Int
         , bChannel :: String
         , bNick :: String
+        , bAdmins :: [String]
+        , bPlugins :: [String]
         } deriving (Show, Read)
 
 data Bot = Bot
@@ -81,3 +85,6 @@ parseLinePrivmsg line = Privmsg author channel message where
         (author:_:channel':rest) = line
         channel = if "#" `isPrefixOf` channel' then channel' else nickFromAuthor author
         message = drop 1 . unwords $ rest
+
+isAdmin :: String -> BotConfig -> Bool
+isAdmin user config = user `elem` bAdmins config

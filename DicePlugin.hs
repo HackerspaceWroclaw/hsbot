@@ -2,15 +2,14 @@ module DicePlugin
 ( plugin
 ) where
 
---import Network
---import System.IO
---import Data.List
---import Control.Monad
---import Control.Monad.Random
---import Control.Exception
---import System.IO.Error
+-- This plugin very needs refactorization in terms of evaluate-try-exceptions, it stinks
 
---import IrcUtilities
+import Data.List(isPrefixOf)
+import Control.Monad(when)
+import Control.Monad.Random(evalRandIO, getRandomR, RandomGen, Rand)
+import Control.Exception(try, evaluate, SomeException)
+
+import IrcUtilities(IrcMsg(Privmsg), Bot(Bot), Plugin(Plugin), privmsgTo, bNick, readInt)
 import Redirection(unwrapRedirectFromMsg)
 
 -- Plugin Info
@@ -41,6 +40,7 @@ parse0 = do
         value <- evalRandIO (dice 1 6)
         return $ "Wylosowana liczba (1-6) to " ++ show value
 
+-- Code below, parse1 and parse2 needs refactorization
 parse1 :: String -> IO String
 parse1 arg1 = do
         max' <- (try . evaluate . readInt) arg1 :: IO (Either SomeException Int)
@@ -76,7 +76,7 @@ helpAvailableModCmds = []
 
 helpCmd :: String -> [String]
 helpCmd "dice" = [
-        ",dice # Prints random number between 1 and 6",
-        ",dice <n> # Prints random numbers between 1 and <n>",
-        ",dice <min> <max> # Prints random numbers between <min> and <max>"
+        ",dice # Wyświetla losową liczbę pomiędzy 1 i 6",
+        ",dice <n> # Wyświetla losową liczbę pomiędzy 1 i <n>",
+        ",dice <min> <max> # Wyświetla losową liczbę pomiędzy <min> i <max>"
         ]

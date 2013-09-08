@@ -1,35 +1,50 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module GooglePlugin
-( run
+( plugin
 ) where
 
-import Network
-import System.IO
-import Data.List
-import Data.Aeson
-import Data.Maybe
-import Network.HTTP.Types
-import Network.HTTP.Conduit
-import Control.Applicative
-import Control.Monad
-import qualified Data.ByteString.Lazy as L
-import qualified Control.Exception as E
+import Data.List(isPrefixOf)
+import Data.Aeson(FromJSON(parseJSON), (.:), Value(Object), decode)
+import Network.HTTP.Conduit(HttpException, httpLbs, withManager, parseUrl, responseBody)
+import Control.Applicative((<$>), (<*>))
+import Control.Monad(mzero, when)
+import qualified Data.ByteString.Lazy as L(ByteString)
+import qualified Control.Exception as E(catch)
 
-import IrcUtilities
-import Redirection
-
-plugin :: Plugin
-plugin = Plugin "KarmaPlugin" run helpAvailableUserCmds helpAvailableModCmds helpCmd
+import IrcUtilities(IrcMsg(Privmsg), Bot(Bot), Plugin(Plugin), privmsgTo, bNick)
+import Redirection(unwrapRedirectFromMsg)
 
 -- Plugin Config
-apiUrl :: String
+plugin :: Plugin
+plugin = Plugin "GooglePlugin" run helpAvailableUserCmds helpAvailableModCmds helpCmd
+
 apiUrl = "https://www.googleapis.com/customsearch/v1?"
 
 data GooglePluginConfig = GooglePluginConfig
         { apiKey :: String
         , cxValue :: String
         } deriving (Show, Read)
+
+-- Main run
+run :: IrcMsg -> Bot -> IO ()
+run (Privmsg author channel message) bot@(Bot h config configDir) = when (",g " `isPrefixOf` message') $ do
+        pluginConfig <- fetchConfig configDir
+        if (null query) then
+                privmsgTo h channel "Brak frazy do wyszukania" target
+        else (do
+        jsonResult <- fetchJsonString $ requestUrl pluginConfig query
+        case jsonResult of
+                Right jsonString -> do
+                        fetchRes <- fetchResult jsonString
+                        case fetchRes of 
+                                Right str -> privmsgTo h channel str target
+                                Left error -> putStrLn error
+                Left error -> putStrLn error)
+        where
+                (message', target) = unwrapRedirectFromMsg message author (bNick config)
+                query = unwrapQuery message'
+run _ _ = return ()
 
 -- Based on plugin config and a query, generates request url
 requestUrl :: GooglePluginConfig -> String -> String
@@ -52,26 +67,6 @@ fetchResult jsonString = do
         case maybeGSearch of
                 Just gSearch -> return $ Right ( formattedGItem $ (head . items) gSearch)
                 Nothing -> return $ Left "JSon decoding error"
-
-run :: IrcMsg -> Bot -> IO ()
-run (Privmsg author channel message) bot@(Bot h config configDir) = when (",g " `isPrefixOf` message') $ do
-        pluginConfig <- fetchConfig configDir
-        if (null query) then
-                privmsgTo h channel "Brak frazy do wyszukania" target
-        else (do
-        jsonResult <- fetchJsonString $ requestUrl pluginConfig query
-        case jsonResult of
-                Right jsonString -> do
-                        fetchRes <- fetchResult jsonString
-                        case fetchRes of 
-                                Right str -> privmsgTo h channel str target
-                                Left error -> putStrLn error
-                Left error -> putStrLn error)
-        where
-                (message', target) = unwrapRedirectFromMsg message author (bNick config)
-                query = unwrapQuery message'
-run _ _ = return ()
-
 
 -- Utils
 formattedGItem :: GItem -> String
@@ -129,4 +124,4 @@ helpAvailableModCmds :: [String]
 helpAvailableModCmds = []
 
 helpCmd :: String -> [String]
-helpCmd "g" = [",g <query> # Fetch first result of searching <query> in google (with title and description)"]
+helpCmd "g" = [",g <query> # Pobiera pierwszy wynik wyszukiwania <query> w google, razem z tytułem i opisem"]

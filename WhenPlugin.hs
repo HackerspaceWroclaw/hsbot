@@ -43,4 +43,4 @@ helpAvailableModCmds :: [String]
 helpAvailableModCmds = []
 
 helpCmd :: String -> [String]
-helpCmd "when" = [",when # Prints date of nearest HS:WRO meeting"]
+helpCmd "when" = [",when # Wyświetla datę najbliższego spotkania"]

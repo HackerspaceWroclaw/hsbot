@@ -6,7 +6,7 @@ import IrcUtilities(IrcMsg(Ping), Plugin(Plugin), Bot, write, handle)
 
 -- Plugin Info
 plugin :: Plugin
-plugin = "IrcservPongPlugin", Plugin "IrcservPongPlugin" run helpAvailableUserCmds helpAvailableModCmds undefined
+plugin = Plugin "IrcservPongPlugin" run helpAvailableUserCmds helpAvailableModCmds undefined
 
 -- Main run
 run :: IrcMsg -> Bot -> IO ()
