@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module WhenPlugin
 ( plugin
 ) where
@@ -7,8 +9,10 @@ import Control.Monad(when)
 import Text.XML.HXT.Core((>>>), (/>), runX, getChildren, deep, hasAttrValue, readString, withParseHTML, withWarnings, getText, yes, no)
 import Text.HandsomeSoup(css)
 import Network.HTTP(simpleHTTP, getRequest, getResponseBody)
+import qualified Data.ByteString as BS(ByteString)
+import qualified Data.ByteString.Char8 as B(pack)
 
-import IrcUtilities(Plugin(Plugin), Bot(Bot), IrcMsg(Privmsg), privmsgTo, bNick)
+import IrcUtilities(Plugin(Plugin), Bot(Bot), IrcMsg(Privmsg), privmsgTo, bNick, msgTo)
 import Redirection(unwrapRedirectFromMsg)
 
 -- Plugin Info
@@ -18,13 +22,14 @@ plugin = Plugin "WhenPlugin" run helpAvailableUserCmds helpAvailableModCmds help
 spotkaniaUrl = "http://wiki.hswro.org/spotkania"
 
 -- Main run
-run :: IrcMsg -> Bot -> IO ()
-run (Privmsg author channel message) bot@(Bot h config configDir) = when (",when" `isPrefixOf` message') $ do
+run :: IrcMsg -> Bot -> IO [BS.ByteString]
+run (Privmsg author channel message) bot@(Bot h config configDir) = if (",when" `isPrefixOf` message') then do
         lastDate <- fetchLastDate
-        privmsgTo h channel ("Najblizsze spotkanie odbedzie sie " ++ lastDate) target
+        return [(msgTo target (B.pack ("Najblizsze spotkanie odbedzie sie " ++ lastDate)))]
+        else (return [])
         where
                 (message', target) = unwrapRedirectFromMsg message author (bNick config)
-run _ _ = return ()
+run _ _ = return []
 
 fetchLastDate :: IO String
 fetchLastDate = do

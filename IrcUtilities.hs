@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module IrcUtilities
 ( write
 , privmsg
@@ -10,6 +12,8 @@ module IrcUtilities
 , Plugin(Plugin), name, run, helpAvailableUserCmds, helpAvailableModCmds, helpCmd
 , nickFromAuthor
 , isAdmin
+, forever
+, msgTo
 ) where
 
 import Network
@@ -17,10 +21,12 @@ import System.IO
 import Text.Printf
 import Data.List
 import Data.Map(fromList)
+import qualified Data.ByteString as BS(ByteString, concat)
+import qualified Data.ByteString.Char8 as B(pack)
 
 data Plugin = Plugin
         { name :: String
-        , run :: IrcMsg -> Bot -> IO ()
+        , run :: IrcMsg -> Bot -> IO [BS.ByteString]
         , helpAvailableUserCmds :: [String]
         , helpAvailableModCmds :: [String]
         , helpCmd :: String -> [String]
@@ -64,6 +70,11 @@ privmsgTo h chan msg receiver = case receiver of
         Just nick -> privmsg h chan (nick ++ ": " ++ msg)
         Nothing -> privmsg h chan msg
 
+msgTo :: Maybe String -> BS.ByteString -> BS.ByteString
+msgTo receiver msg = case receiver of
+        Just nick -> BS.concat [(B.pack nick), ": ", msg]
+        Nothing -> msg
+
 readInt :: String -> Int
 readInt = read
 
@@ -88,3 +99,6 @@ parseLinePrivmsg line = Privmsg author channel message where
 
 isAdmin :: String -> BotConfig -> Bool
 isAdmin user config = user `elem` bAdmins config
+
+forever :: (Monad m) => m a -> m a
+forever a = a >> forever a
