@@ -1,20 +1,24 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Network
-import System.IO
-import Text.Printf
-import Data.List
-import System.Exit
+import Network(PortID(PortNumber), connectTo)
+import System.IO(BufferMode(NoBuffering), hSetBuffering, hGetLine)
 import Control.Monad(mapM)
+import Data.Maybe(isJust, fromJust)
 import Control.Monad.IO.Class(liftIO)
-import Data.Map(elems)
 import System.Environment (getArgs)
-import qualified Data.ByteString.Char8 as B(pack, unpack)
+import qualified Data.ByteString.Char8 as B(unpack)
+import Data.ByteString(ByteString)
+import Control.Monad(when)
+import qualified Data.Text as T(unpack)
+import qualified Data.Text.Encoding as E(encodeUtf8, decodeUtf8)
+import GHC.Conc(forkIO, threadDelay)
+import Database.Redis(Connection, Redis, Reply, runRedis, lpush, connect, defaultConnectInfo, rpop)
 
-import IrcUtilities
+import IrcUtilities(Bot(Bot), BotConfig(BotConfig), write, bNick, bChannel, bPort, bServer, run, parseLine)
+import MyUtils(forever)
 import PluginsCore(enabledPlugins)
-import HelpCore(runHelp)
-import Database.Redis(runRedis, lpush, connect, Connection, Redis, defaultConnectInfo)
+import qualified HelpCore(run)
+import qualified PongCore(run)
 
 main = do
         (config, configDir) <- fetchConfig
@@ -32,9 +36,10 @@ runBot :: BotConfig -> FilePath -> IO ()
 runBot config configDir = do
         h <- connectTo (bServer config) (PortNumber (fromIntegral $ (bPort config)))
         hSetBuffering h NoBuffering
-        write h "NICK" (bNick config)
-        write h "USER" ((bNick config) ++ " 0 * :tutorial bot")
-        write h "JOIN" (bChannel config)
+        write h $ "NICK " ++ (bNick config)
+        write h $ "USER " ++ (bNick config) ++ " 0 * :tutorial bot"
+        write h $ "JOIN " ++ (bChannel config)
+        forkIO $ tell (Bot h config configDir)
         listen (Bot h config configDir)
 
 listen :: Bot -> IO ()
@@ -45,24 +50,31 @@ listen bot = do
 listen_loop :: Bot -> Connection -> Redis ()
 listen_loop bot@(Bot h config _) conn = do
         msgs <- liftIO $ do
-                t <- hGetLine h
-                let ircMsg = parseLine t
+                ircMsg <- fmap parseLine $ hGetLine h
+                --putStrLn $ show ircMsg
+                results' <- sequence [HelpCore.run ircMsg bot, PongCore.run ircMsg bot]
                 results <- mapM (\p -> (run p) ircMsg bot) $ enabledPlugins config
-                return $ concat results
+                return $ map E.encodeUtf8 $ concat $ results ++ results'
         lpush "ircQueue" msgs
         return ()
 
+tell :: Bot -> IO ()
+tell bot = do
+        conn <- connect defaultConnectInfo
+        runRedis conn $ forever $ tell_loop bot conn
 
--- W pluginach chyba musi zostać to IO, ale możemy zmienić na IO [String], potem zbierać te stringi i robić concata
--- Poza tym to nie może być String tylko ten ByteString
+tell_loop :: Bot -> Connection -> Redis ()
+tell_loop bot@(Bot h config _) conn = do
+        eitherMsg <- rpop "ircQueue"
+        liftIO $ do
+                threadDelay 500000
+                msg <- unwrapMsg eitherMsg
+                when (isJust msg) $ write h $ (T.unpack . E.decodeUtf8 . fromJust) msg
+        return ()
 
-        --hello <- get "hello"
-        --world <- get "world"
-        --liftIO $ print (hello,world)
---
---putStrLn t
---let ircMsg = parseLine t
---putStrLn $ show ircMsg
---HelpCore.runHelp ircMsg bot
---mapM (\p -> (run p) ircMsg bot) $ enabledPlugins config
-
+unwrapMsg :: Either (Reply) (Maybe ByteString) -> IO (Maybe ByteString)
+unwrapMsg msg = case msg of
+        Right maybeMsg -> case maybeMsg of
+                Just msg -> return $ Just msg
+                Nothing -> return Nothing
+        Left reply -> return Nothing

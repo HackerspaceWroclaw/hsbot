@@ -4,5 +4,5 @@ BotConfig {
 	bChannel = "#hackerspace-wro",
 	bNick = "hsbotFromFuture",
 	bAdmins = ["swistak35", "Greyer", "pm7", "Marqin"],
-	bPlugins = ["DicePlugin", "GooglePlugin", "IrcservPongPlugin", "KarmaPlugin", "QuitPlugin", "WhenPlugin"]
+	bPlugins = ["DicePlugin", "GooglePlugin", "IrcservPongPlugin", "KarmaPlugin", "QuitPlugin", "WhenPlugin", "SayPlugin"]
 }

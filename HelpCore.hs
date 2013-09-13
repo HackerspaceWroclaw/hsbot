@@ -1,32 +1,34 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module HelpCore
-( runHelp
+( run
 ) where
 
-import Data.String.Utils(join)
 import Data.Maybe(fromJust)
-import Data.List(isPrefixOf, find)
-import Control.Monad(when)
+import Data.List(find)
+import qualified Data.Text as T(Text, intercalate, isPrefixOf, words, concat, unwords)
 
-import IrcUtilities(IrcMsg(Privmsg), Bot(Bot), Plugin(Plugin), bNick, privmsgTo, helpAvailableModCmds, helpAvailableUserCmds, helpCmd)
+import IrcUtilities(IrcMsg(Privmsg), Bot(Bot), Plugin(Plugin), bNick, msgTo, helpAvailableModCmds, helpAvailableUserCmds, helpCmd)
+import MyUtils(when)
 import PluginsCore(enabledPlugins)
 import Redirection(unwrapRedirectFromMsg)
 
-runHelp :: IrcMsg -> Bot -> IO ()
-runHelp (Privmsg author channel message) bot@(Bot h config _) = when (",help" `isPrefixOf` message') $ do
+run :: IrcMsg -> Bot -> IO [T.Text]
+run (Privmsg author channel message) bot@(Bot h config _) = when (",help" `T.isPrefixOf` message') $ do
         if (length args <= 1) then
-                privmsgTo h channel ("Komendy: " ++ (unwords userCmds) ++ " | Moderatorskie: " ++ (unwords modCmds)) target
-        else (do
-                privmsgTo h channel (join " | " correctHelpCmd) target)
+                return [msgTo channel target $ T.concat ["Komendy: ", T.unwords userCmds, " | Moderatorskie: ", T.unwords modCmds]]
+        else
+                return [msgTo channel target (T.intercalate " | " correctHelpCmd)]
         where
                 (message', target) = unwrapRedirectFromMsg message author (bNick config)
-                args = words message'
-                searchCmd = args !! 1
+                args = T.words message'
+                searchCmd = args !! 1 -- cmd which we want help, is second arg: ",help <cmd>"
                 enabledPlugins' = enabledPlugins config
-                userCmds = concat $ map helpAvailableUserCmds enabledPlugins'
-                modCmds = concat $ map helpAvailableModCmds enabledPlugins'
-                correctHelpCmd :: [String]
+                userCmds = concatMap helpAvailableUserCmds enabledPlugins'
+                modCmds = concatMap helpAvailableModCmds enabledPlugins'
+                correctHelpCmd :: [T.Text]
                 correctHelpCmd
                         | searchCmd `elem` userCmds = helpCmd (fromJust $ find (\p -> searchCmd `elem` helpAvailableUserCmds p) enabledPlugins') searchCmd
                         | searchCmd `elem` modCmds = helpCmd (fromJust $ find (\p -> searchCmd `elem` helpAvailableModCmds p) enabledPlugins') searchCmd
                         | otherwise = ["Nie znaleziono takiej komendy"]
-runHelp _ _ = return ()
+run _ _ = return []
