@@ -4,15 +4,17 @@ module GooglePlugin
 ( plugin
 ) where
 
-import Data.List(isPrefixOf)
 import Data.Aeson(FromJSON(parseJSON), (.:), Value(Object), decode)
 import Network.HTTP.Conduit(HttpException, httpLbs, withManager, parseUrl, responseBody)
 import Control.Applicative((<$>), (<*>))
-import Control.Monad(mzero, when)
+import Control.Monad(mzero)
+import Data.Maybe(isJust, fromJust)
 import qualified Data.ByteString.Lazy as L(ByteString)
 import qualified Control.Exception as E(catch)
+import qualified Data.Text as T(Text, isPrefixOf, words, unwords, tail, unpack, null, concat)
 
-import IrcUtilities(IrcMsg(Privmsg), Bot(Bot), Plugin(Plugin), privmsgTo, bNick)
+import IrcUtilities(IrcMsg(Privmsg), Bot(Bot), Plugin(Plugin), msgTo, bNick)
+import MyUtils(when)
 import Redirection(unwrapRedirectFromMsg)
 
 -- Plugin Config
@@ -27,53 +29,49 @@ data GooglePluginConfig = GooglePluginConfig
         } deriving (Show, Read)
 
 -- Main run
-run :: IrcMsg -> Bot -> IO ()
-run (Privmsg author channel message) bot@(Bot h config configDir) = when (",g " `isPrefixOf` message') $ do
+run :: IrcMsg -> Bot -> IO [T.Text]
+run (Privmsg author channel message) bot@(Bot _ config configDir) = when (",g " `T.isPrefixOf` message') $ do
         pluginConfig <- fetchConfig configDir
-        if (null query) then
-                privmsgTo h channel "Brak frazy do wyszukania" target
+        if (T.null query) then
+                return [msgTo channel target "Brak frazy do wyszukania"]
         else (do
-        jsonResult <- fetchJsonString $ requestUrl pluginConfig query
-        case jsonResult of
-                Right jsonString -> do
-                        fetchRes <- fetchResult jsonString
-                        case fetchRes of 
-                                Right str -> privmsgTo h channel str target
-                                Left error -> putStrLn error
-                Left error -> putStrLn error)
+                jsonResult <- fetchJsonString $ requestUrl pluginConfig query
+                when (isJust jsonResult) $ do
+                        fetchRes <- fetchResult . fromJust $ jsonResult
+                        when (isJust fetchRes) $ return [msgTo channel target $ fromJust fetchRes])
         where
                 (message', target) = unwrapRedirectFromMsg message author (bNick config)
                 query = unwrapQuery message'
-run _ _ = return ()
+run _ _ = return []
 
 -- Based on plugin config and a query, generates request url
-requestUrl :: GooglePluginConfig -> String -> String
-requestUrl config query = apiUrl ++ "key=" ++ (apiKey config) ++ "&cx=" ++ (cxValue config) ++ "&q=" ++ query
+requestUrl :: GooglePluginConfig -> T.Text -> String
+requestUrl config query = apiUrl ++ "key=" ++ (apiKey config) ++ "&cx=" ++ (cxValue config) ++ "&q=" ++ (T.unpack query)
 
 -- fetch json response from the server
-fetchJsonString :: String -> IO (Either String L.ByteString)
+fetchJsonString :: String -> IO (Maybe L.ByteString)
 fetchJsonString reqUrl = do
         request <- parseUrl reqUrl
         E.catch (do
                         response <- withManager $ httpLbs request
-                        return $ Right (responseBody response))
-                (\e -> return $ Left (show (e :: HttpException)) )
+                        return $ Just (responseBody response))
+                (\e -> (putStrLn . show) (e :: HttpException) >> return Nothing)
 
 
--- retrieve result from json
-fetchResult :: L.ByteString -> IO (Either String String)
+-- retrieve google result from json
+fetchResult :: L.ByteString -> IO (Maybe T.Text)
 fetchResult jsonString = do
         let maybeGSearch = (decode jsonString) :: Maybe GSearch
         case maybeGSearch of
-                Just gSearch -> return $ Right ( formattedGItem $ (head . items) gSearch)
-                Nothing -> return $ Left "JSon decoding error"
+                Just gSearch -> return $ Just $ (formattedGItem . head . items) gSearch
+                Nothing -> putStrLn "GooglePlugin: JSON Decoding error" >> return Nothing
 
 -- Utils
-formattedGItem :: GItem -> String
-formattedGItem (GItem title link snippet) = "Google search: \"" ++ title ++ "\" <" ++ link ++ "> (" ++ snippet ++ ")"
+formattedGItem :: GItem -> T.Text
+formattedGItem (GItem title link snippet) = T.concat ["Google search: \"", title, "\" <", link, "> (", snippet, ")"]
 
-unwrapQuery :: String -> String
-unwrapQuery = unwords . tail . words
+unwrapQuery :: T.Text -> T.Text
+unwrapQuery = T.unwords . tail . T.words
 
 fetchConfig :: FilePath -> IO GooglePluginConfig
 fetchConfig configDir = do
@@ -82,18 +80,18 @@ fetchConfig configDir = do
 
 -- Data structures for JSON parsing
 data GSearch = GSearch
-        { kind :: String
+        { kind :: T.Text
         , items :: [GItem]
         , searchInformation :: GSearchInfo
         } deriving Show
 data GItem = GItem
-        { title :: String
-        , link :: String
-        , snippet :: String
+        { title :: T.Text
+        , link :: T.Text
+        , snippet :: T.Text
         } deriving Show
 data GSearchInfo = GSearchInfo
-        { formattedSearchTime :: String
-        , formattedTotalResults :: String
+        { formattedSearchTime :: T.Text
+        , formattedTotalResults :: T.Text
         } deriving Show
 
 instance FromJSON GSearch where
@@ -117,11 +115,11 @@ instance FromJSON GSearchInfo where
         parseJSON _ = mzero
 
 -- Help
-helpAvailableUserCmds :: [String]
+helpAvailableUserCmds :: [T.Text]
 helpAvailableUserCmds = ["g"]
 
-helpAvailableModCmds :: [String]
+helpAvailableModCmds :: [T.Text]
 helpAvailableModCmds = []
 
-helpCmd :: String -> [String]
+helpCmd :: T.Text -> [T.Text]
 helpCmd "g" = [",g <query> # Pobiera pierwszy wynik wyszukiwania <query> w google, razem z tytułem i opisem"]

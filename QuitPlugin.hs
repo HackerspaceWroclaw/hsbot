@@ -1,29 +1,33 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module QuitPlugin
 ( plugin
 ) where
 
 import System.Exit(exitWith, ExitCode(ExitSuccess))
-import Data.List(isPrefixOf)
-import Control.Monad(when)
+import qualified Data.Text as T(Text, isPrefixOf)
 
-import IrcUtilities(Plugin(Plugin), IrcMsg(Privmsg), Bot(Bot), handle, write, isAdmin, nickFromAuthor)
+import IrcUtilities(Plugin(Plugin), IrcMsg(Privmsg), Bot(Bot), handle, isAdmin, nickFromAuthor, bNick)
+import Redirection(unwrapRedirectFromMsg)
+import MyUtils(when)
 
 -- Plugin Info
 plugin :: Plugin
 plugin = Plugin "QuitPlugin" run helpAvailableUserCmds helpAvailableModCmds helpCmd
 
 -- Main run
-run :: IrcMsg -> Bot -> IO ()
-run (Privmsg author _ message) bot@(Bot h config _) = when (",quit" `isPrefixOf` message && nick `isAdmin` config) $ write h "QUIT" ":Bye!" >> exitWith ExitSuccess where
+run :: IrcMsg -> Bot -> IO [T.Text]
+run (Privmsg author _ message) bot@(Bot _ config _) = when (",quit" `T.isPrefixOf` message' && nick `isAdmin` config) $ return ["QUIT :Bye!"] >> exitWith ExitSuccess where
         nick = nickFromAuthor author
-run _ _ = return ()
+        (message', _) = unwrapRedirectFromMsg message author (bNick config)
+run _ _ = return []
 
 -- Help
-helpAvailableUserCmds :: [String]
+helpAvailableUserCmds :: [T.Text]
 helpAvailableUserCmds = []
 
-helpAvailableModCmds :: [String]
+helpAvailableModCmds :: [T.Text]
 helpAvailableModCmds = ["quit"]
 
-helpCmd :: String -> [String]
+helpCmd :: T.Text -> [T.Text]
 helpCmd "quit" = [",quit # Każe botu sobie pójść"]

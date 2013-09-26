@@ -65,9 +65,9 @@ tell bot = do
 
 tell_loop :: Bot -> Connection -> Redis ()
 tell_loop bot@(Bot h config _) conn = do
+        liftIO $ threadDelay 200000
         eitherMsg <- rpop "ircQueue"
         liftIO $ do
-                threadDelay 500000
                 msg <- unwrapMsg eitherMsg
                 when (isJust msg) $ write h $ (T.unpack . E.decodeUtf8 . fromJust) msg
         return ()

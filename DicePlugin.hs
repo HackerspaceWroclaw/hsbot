@@ -4,10 +4,10 @@ module DicePlugin
 
 -- This plugin very needs refactorization in terms of evaluate-try-exceptions, it stinks
 
-import Data.List(isPrefixOf)
 import Control.Monad(when)
 import Control.Monad.Random(evalRandIO, getRandomR, RandomGen, Rand)
 import Control.Exception(try, evaluate, SomeException)
+import qualified Data.Text as T(Text, isPrefixOf, pack)
 
 import IrcUtilities(IrcMsg(Privmsg), Bot(Bot), Plugin(Plugin), privmsgTo, bNick, readInt)
 import Redirection(unwrapRedirectFromMsg)
@@ -17,15 +17,15 @@ plugin :: Plugin
 plugin = Plugin "DicePlugin" run helpAvailableUserCmds helpAvailableModCmds helpCmd
 
 -- Main run
-run :: IrcMsg -> Bot -> IO ()
-run (Privmsg author channel message) bot@(Bot h config configDir) = when (",dice" `isPrefixOf` message') $ do
+run :: IrcMsg -> Bot -> IO [T.Text]
+run (Privmsg author channel message) bot@(Bot _ config _) = when (",dice" `T.isPrefixOf` message') $ do
         response <- parse message'
-        privmsgTo h channel response target
+        msgTo channel target response
         where
                 (message', target) = unwrapRedirectFromMsg message author (bNick config)
-run _ _ = return ()
+run _ _ = return []
 
-parse :: String -> IO String
+parse :: T.Text -> IO T.Text
 parse msg
         | argsCount == 1 = parse0
         | argsCount == 2 = parse1 (args !! 1)
@@ -35,13 +35,14 @@ parse msg
                 args = words msg
                 argsCount = length args
 
-parse0 :: IO String
+-- It can be refactorized to one-liner
+parse0 :: IO T.Text
 parse0 = do
         value <- evalRandIO (dice 1 6)
-        return $ "Wylosowana liczba (1-6) to " ++ show value
+        return $ (append "Wylosowana liczba (1-6) to " . T.pack . show) value
 
 -- Code below, parse1 and parse2 needs refactorization
-parse1 :: String -> IO String
+parse1 :: T.Text -> IO T.Text
 parse1 arg1 = do
         max' <- (try . evaluate . readInt) arg1 :: IO (Either SomeException Int)
         case max' of
