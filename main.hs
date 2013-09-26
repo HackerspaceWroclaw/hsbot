@@ -12,9 +12,9 @@ import Control.Monad(when)
 import qualified Data.Text as T(unpack)
 import qualified Data.Text.Encoding as E(encodeUtf8, decodeUtf8)
 import GHC.Conc(forkIO, threadDelay)
-import Database.Redis(Connection, Redis, Reply, runRedis, lpush, connect, defaultConnectInfo, rpop)
+import Database.Redis(Connection, Redis, Reply, runRedis, lpush, connect, defaultConnectInfo, rpop, connectPort)
 
-import IrcUtilities(Bot(Bot), BotConfig(BotConfig), write, bNick, bChannel, bPort, bServer, run, parseLine)
+import IrcUtilities(Bot(Bot), BotConfig(BotConfig), write, bNick, bChannel, bPort, bServer, run, parseLine, bRedisPort)
 import MyUtils(forever)
 import PluginsCore(enabledPlugins)
 import qualified HelpCore(run)
@@ -43,8 +43,8 @@ runBot config configDir = do
         listen (Bot h config configDir)
 
 listen :: Bot -> IO ()
-listen bot = do
-        conn <- connect defaultConnectInfo
+listen bot@(Bot _ config _) = do
+        conn <- connect defaultConnectInfo { connectPort = PortNumber (fromIntegral $ (bRedisPort config)) }
         runRedis conn $ forever $ listen_loop bot conn
 
 listen_loop :: Bot -> Connection -> Redis ()
@@ -59,8 +59,8 @@ listen_loop bot@(Bot h config _) conn = do
         return ()
 
 tell :: Bot -> IO ()
-tell bot = do
-        conn <- connect defaultConnectInfo
+tell bot@(Bot _ config _) = do
+        conn <- connect defaultConnectInfo { connectPort = PortNumber (fromIntegral $ (bRedisPort config)) }
         runRedis conn $ forever $ tell_loop bot conn
 
 tell_loop :: Bot -> Connection -> Redis ()

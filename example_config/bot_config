@@ -3,6 +3,7 @@ BotConfig {
 	bPort = 6667,
 	bChannel = "#hackerspace-wro",
 	bNick = "hsbotFromFuture",
+	bRedisPort = 6379,
 	bAdmins = ["swistak35", "Greyer", "pm7", "Marqin"],
 	bPlugins = ["DicePlugin", "GooglePlugin", "IrcservPongPlugin", "KarmaPlugin", "QuitPlugin", "WhenPlugin", "SayPlugin"]
 }

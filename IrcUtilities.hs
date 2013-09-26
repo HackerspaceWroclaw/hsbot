@@ -5,7 +5,7 @@ module IrcUtilities
 , privmsg
 , parseLine
 , IrcMsg(Privmsg, Ping), author, channel, message, host, line
-, BotConfig(BotConfig), bServer, bPort, bChannel, bNick, bAdmins, bPlugins
+, BotConfig(BotConfig), bServer, bPort, bChannel, bNick, bRedisPort, bAdmins, bPlugins
 , Bot(Bot), handle, config, configDir
 , Plugin(Plugin), name, run, helpAvailableUserCmds, helpAvailableModCmds, helpCmd
 , nickFromAuthor
@@ -33,6 +33,7 @@ data BotConfig = BotConfig
         , bPort :: Int
         , bChannel :: String
         , bNick :: String
+        , bRedisPort :: Int
         , bAdmins :: [String]
         , bPlugins :: [String]
         } deriving (Show, Read)
